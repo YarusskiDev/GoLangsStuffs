@@ -1,0 +1,4 @@
+go mod tidy = remove todas as dependencias que não estão sendo usadas.
+
+*int cria uma variavel do tipo PONTEIRO DE INT.
+& permite adicionar um endereço de memoria em uma variavel do tipo PONTEIRO
