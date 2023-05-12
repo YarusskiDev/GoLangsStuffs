@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strconv"
+
+	"github.com/gorilla/mux"
 
 	banco "meumodulo/BancoDeDados"
 
@@ -45,7 +48,6 @@ func CriarUsuario(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println("Query SQL:", query)
 
 	_, erro = db.Exec(query, sql.Named("Nome", usuario.Nome), sql.Named("Email", usuario.Email))
-	db.Prepare()
 	if erro != nil {
 		log.Println("Erro ao inserir usuário:", erro)
 		w.Write([]byte("erro ao executar o statement"))
@@ -93,4 +95,107 @@ func BuscarUsuarios(w http.ResponseWriter, r *http.Request) {
 	if erro := json.NewEncoder(w).Encode(usuariosBdArray); erro != nil {
 		w.Write([]byte("erro ao converter os usuarios para json!"))
 	}
+
+}
+func BuscarUsuario(w http.ResponseWriter, r *http.Request) {
+
+	parametros := mux.Vars(r)
+	ID, erro := strconv.ParseUint(parametros["id"], 10, 32)
+	if erro != nil {
+		w.Write([]byte("erro ao converver o parametro de id"))
+		return
+	}
+
+	db, erro := banco.Conectar()
+	if erro != nil {
+		w.Write([]byte("erro ao conectar com o banco"))
+		return
+	}
+
+	linha, erro := db.Query("SELECT * FROM usuarios WHERE Id = @Id", sql.Named("Id", ID))
+	if erro != nil {
+		log.Println("Erro :", erro)
+		w.Write([]byte("erro ao buscar o usuario"))
+		return
+	}
+
+	var usuario usuario
+	if linha.Next() {
+		if erro := linha.Scan(&usuario.Id, &usuario.Nome, &usuario.Email); erro != nil {
+			w.Write([]byte("erro ao escanear usuario"))
+			return
+		}
+	}
+
+	if erro := json.NewEncoder(w).Encode(usuario); erro != nil {
+		w.Write([]byte("erro ao converter o usuario para json"))
+		return
+	}
+}
+func AtualizarUsuario(w http.ResponseWriter, r *http.Request) {
+
+	parametros := mux.Vars(r)
+	ID, erro := strconv.ParseUint(parametros["id"], 10, 32)
+	if erro != nil {
+		w.Write([]byte("erro ao converver o parametro de id"))
+		return
+	}
+
+	corpoRequisicao, erro := ioutil.ReadAll(r.Body)
+	if erro != nil {
+		w.Write([]byte("Falha ao ler o corpo"))
+		return
+	}
+
+	var usuario usuario
+
+	if err := json.Unmarshal(corpoRequisicao, &usuario); err != nil {
+		w.Write([]byte("erro ao ler corpo da requisição"))
+		return
+	}
+
+	db, erro := banco.Conectar()
+	if erro != nil {
+		w.Write([]byte("erro ao conectar ao banco"))
+		return
+	}
+	defer db.Close()
+
+	_, erro = db.Exec("update usuarios set nome = @nome, email = @email where Id = @Id", sql.Named("Id", ID),
+		sql.Named("nome", usuario.Nome), sql.Named("email", usuario.Email))
+	if erro != nil {
+		log.Println("Erro :", erro)
+		w.Write([]byte("erro ao buscar o usuario"))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+
+}
+
+func DeletarUsuario(w http.ResponseWriter, r *http.Request) {
+
+	parametros := mux.Vars(r)
+	ID, erro := strconv.ParseUint(parametros["id"], 10, 32)
+	if erro != nil {
+		w.Write([]byte("erro ao converver o parametro de id"))
+		return
+	}
+
+	db, erro := banco.Conectar()
+	if erro != nil {
+		w.Write([]byte("erro ao conectar ao banco"))
+		return
+	}
+	defer db.Close()
+
+	_, erro = db.Exec("delete from usuarios where Id = @Id", sql.Named("Id", ID))
+	if erro != nil {
+		log.Println("Erro :", erro)
+		w.Write([]byte("erro ao deletar o usuario"))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+
 }
